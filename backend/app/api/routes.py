@@ -1,0 +1,66 @@
+from fastapi import APIRouter, HTTPException, Query
+
+from app.schemas.search import (
+    HealthResponse,
+    IndexingSummaryResponse,
+    IndexRepositoryRequest,
+    SearchResponse,
+    SearchResultResponse,
+)
+from app.services.search_engine import SearchEngine
+
+router = APIRouter()
+
+# In-memory engine for now.
+# Later, PostgreSQL will make this persistent across restarts.
+search_engine = SearchEngine()
+
+
+@router.get("/health", response_model=HealthResponse)
+def health_check() -> HealthResponse:
+    return HealthResponse(
+        status="ok",
+        indexed_documents=search_engine.total_documents(),
+    )
+
+
+@router.post("/index", response_model=IndexingSummaryResponse)
+def index_repository(request: IndexRepositoryRequest) -> IndexingSummaryResponse:
+    try:
+        summary = search_engine.index_repository(request.repo_path)
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except NotADirectoryError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+
+    return IndexingSummaryResponse(
+        repo_path=summary.repo_path,
+        files_indexed=summary.files_indexed,
+        total_tokens=summary.total_tokens,
+        indexed_extensions=summary.indexed_extensions,
+    )
+
+
+@router.get("/search", response_model=SearchResponse)
+def search(
+    query: str = Query(..., min_length=1),
+    limit: int = Query(10, ge=1, le=50),
+) -> SearchResponse:
+    results = search_engine.search(query=query, limit=limit)
+
+    response_results = [
+        SearchResultResponse(
+            document_id=result.document_id,
+            relative_path=result.relative_path,
+            score=result.score,
+            matched_tokens=result.matched_tokens,
+            line_numbers=result.line_numbers,
+        )
+        for result in results
+    ]
+
+    return SearchResponse(
+        query=query,
+        result_count=len(response_results),
+        results=response_results,
+    )
