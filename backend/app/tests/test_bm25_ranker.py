@@ -103,3 +103,23 @@ def test_ranker_respects_limit():
     results = ranker.search("jwt", limit=2)
 
     assert len(results) == 2
+
+def test_ranker_returns_snippets_for_matching_lines():
+    index = InvertedIndex()
+    index.add_document(
+        make_source_file(
+            "auth.py",
+            "jwt token\n"
+            "validate user\n"
+            "refresh jwt\n",
+        )
+    )
+
+    ranker = BM25Ranker(index)
+    results = ranker.search("jwt")
+
+    assert len(results) == 1
+    assert results[0].snippets[0].line_number == 1
+    assert results[0].snippets[0].text == "jwt token"
+    assert results[0].snippets[1].line_number == 3
+    assert results[0].snippets[1].text == "refresh jwt"

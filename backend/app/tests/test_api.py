@@ -56,6 +56,10 @@ def test_index_repository_and_search(tmp_path: Path):
     assert search_data["result_count"] >= 1
     assert search_data["results"][0]["relative_path"] == "auth.py"
     assert search_data["results"][0]["matched_tokens"] == ["jwt", "token"]
+    assert "snippets" in search_data["results"][0]
+    assert len(search_data["results"][0]["snippets"]) >= 1
+    assert "line_number" in search_data["results"][0]["snippets"][0]
+    assert "text" in search_data["results"][0]["snippets"][0]
 
 
 def test_index_repository_returns_404_for_missing_path():

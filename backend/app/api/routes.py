@@ -6,6 +6,7 @@ from app.schemas.search import (
     IndexRepositoryRequest,
     SearchResponse,
     SearchResultResponse,
+    SnippetLineResponse
 )
 from app.services.search_engine import SearchEngine
 
@@ -55,6 +56,11 @@ def search(
             score=result.score,
             matched_tokens=result.matched_tokens,
             line_numbers=result.line_numbers,
+            snippets=[SnippetLineResponse(
+                line_number=snippet.line_number,
+                text=snippet.text,  
+            ) for snippet in result.snippets
+            ],
         )
         for result in results
     ]

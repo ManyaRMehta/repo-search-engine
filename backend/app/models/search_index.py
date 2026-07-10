@@ -14,6 +14,7 @@ class IndexedDocument:
     extension: str
     size_bytes: int
     total_tokens: int
+    lines : list[str] 
 
 
 @dataclass

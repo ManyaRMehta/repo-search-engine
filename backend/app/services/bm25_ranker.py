@@ -4,7 +4,10 @@ from collections import defaultdict
 from app.models.search_result import SearchResult
 from app.services.code_tokenizer import CodeTokenizer
 from app.services.inverted_index import InvertedIndex
+from app.models.search_result import SearchResult, SnippetLine
 
+MAX_SNIPPET_LINES = 5
+MAX_SNIPPET_LINE_LENGTH = 160
 
 class BM25Ranker:
     """
@@ -82,6 +85,10 @@ class BM25Ranker:
                     score=score,
                     matched_tokens=sorted(matched_tokens_by_document[document_id]),
                     line_numbers=sorted(line_numbers_by_document[document_id]),
+                    snippets=self._build_snippets(
+                    document_lines=document.lines,
+                    line_numbers=line_numbers_by_document[document_id],
+                    ),
                 )
             )
 
@@ -119,3 +126,36 @@ class BM25Ranker:
         )
 
         return inverse_document_frequency * (numerator / denominator)
+    
+    def _build_snippets(
+        self,
+        document_lines: list[str],
+        line_numbers: set[int],
+    ) -> list[SnippetLine]:
+        snippets: list[SnippetLine] = []
+
+        for line_number in sorted(line_numbers):
+            if len(snippets) >= MAX_SNIPPET_LINES:
+                break
+
+            line_index = line_number - 1
+
+            if line_index < 0 or line_index >= len(document_lines):
+                continue
+
+            snippets.append(
+                SnippetLine(
+                    line_number=line_number,
+                    text=self._truncate_snippet_line(document_lines[line_index]),
+                )
+            )
+
+        return snippets
+
+    def _truncate_snippet_line(self, line: str) -> str:
+        cleaned_line = line.rstrip()
+
+        if len(cleaned_line) <= MAX_SNIPPET_LINE_LENGTH:
+            return cleaned_line
+
+        return cleaned_line[: MAX_SNIPPET_LINE_LENGTH - 3] + "..."

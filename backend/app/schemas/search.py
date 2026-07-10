@@ -11,6 +11,9 @@ class IndexingSummaryResponse(BaseModel):
     total_tokens: int
     indexed_extensions: list[str]
 
+class SnippetLineResponse(BaseModel):
+    line_number: int
+    text: str
 
 class SearchResultResponse(BaseModel):
     document_id: int
@@ -18,6 +21,7 @@ class SearchResultResponse(BaseModel):
     score: float
     matched_tokens: list[str]
     line_numbers: list[int]
+    snippets: list[SnippetLineResponse]
 
 
 class SearchResponse(BaseModel):

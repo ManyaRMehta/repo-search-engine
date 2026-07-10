@@ -36,6 +36,7 @@ class InvertedIndex:
             extension=source_file.extension,
             size_bytes=source_file.size_bytes,
             total_tokens=len(all_tokens),
+            lines = source_file.content.splitlines(),
         )
 
         self.documents[document_id] = indexed_document
