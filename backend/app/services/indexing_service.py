@@ -17,6 +17,8 @@ from app.stores.indexing_run_store import IndexingRunStore
 
 SessionFactory = Callable[[], AbstractContextManager[Session]]
 
+class NoIndexableFilesError(ValueError):
+        """Raised when a repository contains no supported source files."""
 
 class IndexingService:
     """Coordinates persisted documents and runtime search state."""
@@ -77,7 +79,7 @@ class IndexingService:
             source_files = self.crawler.crawl(resolved_repo_path)
 
             if not source_files:
-                raise ValueError(
+                raise NoIndexableFilesError(
                     "No supported source files were found to index."
                 )
 
@@ -263,3 +265,5 @@ class IndexingService:
             size_bytes=document.size_bytes,
             content=document.content,
         )
+
+   
