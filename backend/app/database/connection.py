@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 DEFAULT_DATABASE_URL = (
     "postgresql+psycopg://repo_search:repo_search"
-    "@localhost:5432/repo_search_engine"
+    "@localhost:5433/repo_search_engine"
 )
 
 DATABASE_URL = os.getenv("DATABASE_URL", DEFAULT_DATABASE_URL)
