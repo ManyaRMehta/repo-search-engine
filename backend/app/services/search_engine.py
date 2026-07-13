@@ -6,6 +6,7 @@ from app.services.bm25_ranker import BM25Ranker
 from app.services.inverted_index import InvertedIndex
 from app.services.repository_crawler import RepositoryCrawler
 from app.services.autocomplete_index import AutocompleteIndex
+from app.models.source_file import SourceFile
 
 
 class SearchEngine:
@@ -28,29 +29,22 @@ class SearchEngine:
 
         source_files = self.crawler.crawl(resolved_repo_path)
 
-        self.index = InvertedIndex()
-        document_ids = self.index.add_documents(source_files)
+        new_index = InvertedIndex()
+        document_ids = new_index.add_documents(source_files)
 
-        self.autocomplete = AutocompleteIndex()
-
-        autocomplete_terms = (
-            self.index.vocabulary()
-            | self.index.identifier_vocabulary()
+        self._replace_runtime_index(
+            index=new_index,
+            repo_path=resolved_repo_path,
         )
 
-        self.autocomplete.build(autocomplete_terms)
-
-        self.ranker = BM25Ranker(self.index)
-        self.indexed_repo_path = resolved_repo_path
-
         total_tokens = sum(
-            document.total_tokens for document in self.index.documents.values()
+            document.total_tokens for document in new_index.documents.values()
         )
 
         indexed_extensions = sorted(
             {
                 document.extension
-                for document in self.index.documents.values()
+                for document in new_index.documents.values()
             }
         )
 
@@ -59,6 +53,26 @@ class SearchEngine:
             files_indexed=len(document_ids),
             total_tokens=total_tokens,
             indexed_extensions=indexed_extensions,
+        )
+    
+    def load_documents(
+        self,
+        repo_path: str | Path,
+        documents: list[tuple[int, SourceFile]],
+    ) -> None:
+        resolved_repo_path = Path(repo_path).resolve()
+
+        new_index = InvertedIndex()
+
+        for document_id, source_file in documents:
+            new_index.add_document(
+                source_file,
+                document_id=document_id,
+            )
+
+        self._replace_runtime_index(
+            index=new_index,
+            repo_path=resolved_repo_path,
         )
 
     def search(self, query: str, limit: int = 10) -> list[SearchResult]:
@@ -78,3 +92,23 @@ class SearchEngine:
         self.autocomplete = AutocompleteIndex()
         self.ranker = BM25Ranker(self.index)
         self.indexed_repo_path = None
+
+    def _replace_runtime_index(
+        self,
+        *,
+        index: InvertedIndex,
+        repo_path: Path,
+    ) -> None:
+        autocomplete = AutocompleteIndex()
+
+        autocomplete_terms = (
+            index.vocabulary()
+            | index.identifier_vocabulary()
+        )
+
+        autocomplete.build(autocomplete_terms)
+
+        self.index = index
+        self.autocomplete = autocomplete
+        self.ranker = BM25Ranker(index)
+        self.indexed_repo_path = repo_path

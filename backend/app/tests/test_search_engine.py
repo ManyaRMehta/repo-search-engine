@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from app.services.search_engine import SearchEngine
+from app.models.source_file import SourceFile
 
 
 def test_search_engine_indexes_repository(tmp_path: Path):
@@ -122,3 +123,30 @@ def test_search_engine_returns_autocomplete_suggestions(tmp_path):
         "searchable",
         "SearchEngine",
     ]
+
+def test_load_documents_uses_persisted_document_ids(
+    tmp_path: Path,
+) -> None:
+    engine = SearchEngine()
+
+    source_file = SourceFile(
+        path=tmp_path / "search.py",
+        relative_path="search.py",
+        extension=".py",
+        size_bytes=20,
+        content="class SearchEngine:",
+    )
+
+    engine.load_documents(
+        repo_path=tmp_path,
+        documents=[(42, source_file)],
+    )
+
+    results = engine.search("SearchEngine")
+
+    assert engine.total_documents() == 1
+    assert engine.indexed_repo_path == tmp_path.resolve()
+    assert results[0].document_id == 42
+    suggestions = engine.suggest("Search")
+    assert "search" in suggestions
+    assert "SearchEngine" in suggestions
