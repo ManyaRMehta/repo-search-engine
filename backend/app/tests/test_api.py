@@ -1,10 +1,14 @@
 from pathlib import Path
-
+import pytest
+from app.api.routes import search_engine
 from fastapi.testclient import TestClient
 
 from app.main import app
 
 client = TestClient(app)
+@pytest.fixture(autouse=True)
+def reset_search_engine_between_tests():
+    search_engine.reset()
 
 
 def test_health_check():
@@ -88,3 +92,25 @@ def test_search_respects_limit(tmp_path: Path):
 
     assert response.status_code == 200
     assert response.json()["result_count"] == 2
+
+def test_search_returns_409_before_repository_is_indexed():
+    response = client.get(
+        "/search",
+        params={"query": "jwt"},
+    )
+
+    assert response.status_code == 409
+    assert "No repository has been indexed yet" in response.json()["detail"]
+
+
+def test_index_repository_returns_422_for_empty_repo(tmp_path: Path):
+    repo = tmp_path / "empty_repo"
+    repo.mkdir()
+
+    response = client.post(
+        "/index",
+        json={"repo_path": str(repo)},
+    )
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == "No supported source files were found to index."

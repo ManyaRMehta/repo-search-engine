@@ -56,3 +56,11 @@ class SearchEngine:
 
     def total_documents(self) -> int:
         return self.index.total_documents()
+    
+    def is_ready(self) -> bool:
+        return self.total_documents() > 0
+
+    def reset(self) -> None:
+        self.index = InvertedIndex()
+        self.ranker = BM25Ranker(self.index)
+        self.indexed_repo_path = None

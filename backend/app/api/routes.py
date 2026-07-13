@@ -29,6 +29,11 @@ def health_check() -> HealthResponse:
 def index_repository(request: IndexRepositoryRequest) -> IndexingSummaryResponse:
     try:
         summary = search_engine.index_repository(request.repo_path)
+        if summary.files_indexed == 0:
+            raise HTTPException(
+                status_code=422,
+                detail="No supported source files were found to index.",
+            )
     except FileNotFoundError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
     except NotADirectoryError as error:
@@ -47,6 +52,11 @@ def search(
     query: str = Query(..., min_length=1),
     limit: int = Query(10, ge=1, le=50),
 ) -> SearchResponse:
+    if not search_engine.is_ready():
+        raise HTTPException(
+            status_code=409,
+            detail="No repository has been indexed yet. Call POST /index before searching.",
+        )
     results = search_engine.search(query=query, limit=limit)
 
     response_results = [
