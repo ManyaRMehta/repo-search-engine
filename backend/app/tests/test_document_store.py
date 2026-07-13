@@ -59,7 +59,7 @@ def test_synchronize_creates_documents(
     } == {
         "README.md",
         "app/main.py",
-    }
+}
 
 
 def test_synchronize_preserves_id_for_unchanged_document(
