@@ -1,5 +1,6 @@
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
+from datetime import datetime, timezone
 
 from app.database.records import RepositoryRecord
 
@@ -60,6 +61,55 @@ class RepositoryStore:
         )
 
         repository.is_active = True
+        self.session.flush()
+
+        return repository
+    
+    def get_or_create(
+        self,
+        *,
+        name: str,
+        canonical_path: str,
+    ) -> tuple[RepositoryRecord, bool]:
+        repository = self.get_by_canonical_path(canonical_path)
+
+        if repository is not None:
+            return repository, False
+
+        return (
+            self.create(
+                name=name,
+                canonical_path=canonical_path,
+            ),
+            True,
+        )
+
+    def mark_indexing(
+        self,
+        repository: RepositoryRecord,
+    ) -> RepositoryRecord:
+        repository.status = "indexing"
+        self.session.flush()
+
+        return repository
+
+    def mark_ready(
+        self,
+        repository: RepositoryRecord,
+    ) -> RepositoryRecord:
+        repository.status = "ready"
+        repository.index_version += 1
+        repository.last_indexed_at = datetime.now(timezone.utc)
+
+        self.session.flush()
+
+        return repository
+
+    def mark_failed(
+        self,
+        repository: RepositoryRecord,
+    ) -> RepositoryRecord:
+        repository.status = "failed"
         self.session.flush()
 
         return repository

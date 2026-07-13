@@ -59,3 +59,49 @@ def test_set_active_returns_none_for_missing_repository(
     result = store.set_active(repository_id=999_999)
 
     assert result is None
+
+def test_get_or_create_returns_existing_repository(
+    database_session: Session,
+) -> None:
+    store = RepositoryStore(database_session)
+
+    created_repository, was_created = store.get_or_create(
+        name="sample",
+        canonical_path="/tmp/sample",
+    )
+
+    found_repository, was_created_again = store.get_or_create(
+        name="different-name",
+        canonical_path="/tmp/sample",
+    )
+
+    assert was_created is True
+    assert was_created_again is False
+    assert found_repository.id == created_repository.id
+    assert found_repository.name == "sample"
+
+def test_repository_lifecycle_updates_status_and_version(
+    database_session: Session,
+) -> None:
+    store = RepositoryStore(database_session)
+
+    repository = store.create(
+        name="sample",
+        canonical_path="/tmp/lifecycle-sample",
+    )
+
+    store.mark_indexing(repository)
+
+    assert repository.status == "indexing"
+    assert repository.index_version == 0
+
+    store.mark_ready(repository)
+
+    assert repository.status == "ready"
+    assert repository.index_version == 1
+    assert repository.last_indexed_at is not None
+
+    store.mark_failed(repository)
+
+    assert repository.status == "failed"
+    assert repository.index_version == 1
