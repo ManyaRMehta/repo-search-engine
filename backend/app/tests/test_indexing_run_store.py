@@ -68,3 +68,19 @@ def test_mark_indexing_run_failed(
     assert indexing_run.status == "failed"
     assert indexing_run.completed_at is not None
     assert indexing_run.error_message == "Repository could not be read"
+
+def test_get_indexing_run_by_id(
+    database_session: Session,
+) -> None:
+    repository = RepositoryStore(database_session).create(
+        name="sample",
+        canonical_path="/tmp/get-run-by-id-sample",
+    )
+
+    store = IndexingRunStore(database_session)
+    indexing_run = store.create(repository.id)
+
+    found_run = store.get_by_id(indexing_run.id)
+
+    assert found_run is not None
+    assert found_run.id == indexing_run.id

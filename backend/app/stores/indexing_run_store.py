@@ -59,3 +59,12 @@ class IndexingRunStore:
         self.session.flush()
 
         return indexing_run
+    
+    def get_by_id(
+        self,
+        indexing_run_id: int,
+    ) -> IndexingRunRecord | None:
+        return self.session.get(
+            IndexingRunRecord,
+            indexing_run_id,
+        )

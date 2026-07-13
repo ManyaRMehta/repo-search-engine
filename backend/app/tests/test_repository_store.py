@@ -105,3 +105,18 @@ def test_repository_lifecycle_updates_status_and_version(
 
     assert repository.status == "failed"
     assert repository.index_version == 1
+
+def test_get_repository_by_id(
+    database_session: Session,
+) -> None:
+    store = RepositoryStore(database_session)
+
+    repository = store.create(
+        name="sample",
+        canonical_path="/tmp/get-by-id-sample",
+    )
+
+    found_repository = store.get_by_id(repository.id)
+
+    assert found_repository is not None
+    assert found_repository.id == repository.id

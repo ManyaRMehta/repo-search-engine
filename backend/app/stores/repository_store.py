@@ -113,3 +113,12 @@ class RepositoryStore:
         self.session.flush()
 
         return repository
+    
+    def get_by_id(
+        self,
+        repository_id: int,
+    ) -> RepositoryRecord | None:
+        return self.session.get(
+            RepositoryRecord,
+            repository_id,
+        )
