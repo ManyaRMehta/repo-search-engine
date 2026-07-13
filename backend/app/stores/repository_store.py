@@ -122,3 +122,16 @@ class RepositoryStore:
             RepositoryRecord,
             repository_id,
         )
+    
+    def mark_indexing_failed(
+        self,
+        repository: RepositoryRecord,
+    ) -> RepositoryRecord:
+        if repository.index_version > 0:
+            repository.status = "ready"
+        else:
+            repository.status = "failed"
+
+        self.session.flush()
+
+        return repository

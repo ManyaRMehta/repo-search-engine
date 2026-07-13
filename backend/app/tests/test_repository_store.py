@@ -120,3 +120,35 @@ def test_get_repository_by_id(
 
     assert found_repository is not None
     assert found_repository.id == repository.id
+
+def test_failed_reindex_preserves_previous_ready_version(
+    database_session: Session,
+) -> None:
+    store = RepositoryStore(database_session)
+
+    repository = store.create(
+        name="sample",
+        canonical_path="/tmp/failed-reindex-sample",
+    )
+
+    store.mark_ready(repository)
+    store.mark_indexing(repository)
+    store.mark_indexing_failed(repository)
+
+    assert repository.status == "ready"
+    assert repository.index_version == 1
+
+def test_failed_initial_index_marks_repository_failed(
+    database_session: Session,
+) -> None:
+    store = RepositoryStore(database_session)
+
+    repository = store.create(
+        name="sample",
+        canonical_path="/tmp/failed-initial-index-sample",
+    )
+
+    store.mark_indexing_failed(repository)
+
+    assert repository.status == "failed"
+    assert repository.index_version == 0
