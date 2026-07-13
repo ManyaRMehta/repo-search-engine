@@ -1,6 +1,5 @@
 import re
 
-from matplotlib import text
 
 from app.models.tokenized_line import TokenizedLine
 
