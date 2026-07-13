@@ -10,6 +10,8 @@ from sqlalchemy import (
     Text,
     func,
     text,
+    ForeignKey,
+    UniqueConstraint,
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -89,4 +91,80 @@ class RepositoryRecord(Base):
     last_indexed_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True),
         nullable=True,
+    )
+
+class DocumentRecord(Base):
+    __tablename__ = "documents"
+
+    __table_args__ = (
+        UniqueConstraint(
+            "repository_id",
+            "relative_path",
+            name="uq_documents_repository_relative_path",
+        ),
+        CheckConstraint(
+            "size_bytes >= 0",
+            name="ck_documents_size_bytes_nonnegative",
+        ),
+        CheckConstraint(
+            "line_count >= 0",
+            name="ck_documents_line_count_nonnegative",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(
+        Integer,
+        primary_key=True,
+    )
+
+    repository_id: Mapped[int] = mapped_column(
+        ForeignKey(
+            "repositories.id",
+            ondelete="CASCADE",
+        ),
+        nullable=False,
+        index=True,
+    )
+
+    relative_path: Mapped[str] = mapped_column(
+        Text,
+        nullable=False,
+    )
+
+    extension: Mapped[str] = mapped_column(
+        String(20),
+        nullable=False,
+    )
+
+    size_bytes: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+    )
+
+    line_count: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+    )
+
+    content: Mapped[str] = mapped_column(
+        Text,
+        nullable=False,
+    )
+
+    content_hash: Mapped[str] = mapped_column(
+        String(64),
+        nullable=False,
+    )
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    )
+
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+        onupdate=func.now(),
     )
