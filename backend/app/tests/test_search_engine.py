@@ -94,3 +94,31 @@ def test_search_engine_returns_empty_results_for_empty_query(tmp_path: Path):
     results = engine.search("")
 
     assert results == []
+
+def test_search_engine_returns_autocomplete_suggestions(tmp_path):
+    repo = tmp_path / "sample_repo"
+    repo.mkdir()
+
+    (repo / "search.py").write_text(
+        "class SearchEngine:\n"
+        "    def search_repository(self):\n"
+        "        searchable = True\n",
+        encoding="utf-8",
+    )
+
+    engine = SearchEngine()
+    engine.index_repository(repo)
+
+    assert engine.suggest("search") == [
+    "search",
+    "search_repository",
+    "searchable",
+    "SearchEngine",
+    ]
+
+    assert engine.suggest("Search") == [
+        "search",
+        "search_repository",
+        "searchable",
+        "SearchEngine",
+    ]

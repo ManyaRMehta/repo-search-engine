@@ -1,9 +1,12 @@
 import re
 
+from matplotlib import text
+
 from app.models.tokenized_line import TokenizedLine
 
 
 MIN_TOKEN_LENGTH = 2
+IDENTIFIER_PATTERN = re.compile(r"\b[A-Za-z_][A-Za-z0-9_]*\b")
 
 
 class CodeTokenizer:
@@ -24,6 +27,9 @@ class CodeTokenizer:
             for part in raw_parts
             if len(part) >= MIN_TOKEN_LENGTH
         ]
+    
+    def extract_identifiers(self, text: str) -> list[str]:
+        return IDENTIFIER_PATTERN.findall(text)
 
     def tokenize_by_line(self, text: str) -> list[TokenizedLine]:
         tokenized_lines: list[TokenizedLine] = []

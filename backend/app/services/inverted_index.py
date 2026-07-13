@@ -16,6 +16,7 @@ class InvertedIndex:
         self.tokenizer = tokenizer or CodeTokenizer()
         self.documents: dict[int, IndexedDocument] = {}
         self.postings: dict[str, dict[int, Posting]] = defaultdict(dict)
+        self.identifiers: set[str] = set()
         self._next_document_id = 1
 
     def add_document(self, source_file: SourceFile) -> int:
@@ -23,6 +24,9 @@ class InvertedIndex:
         self._next_document_id += 1
 
         tokenized_lines = self.tokenizer.tokenize_by_line(source_file.content)
+        self.identifiers.update(
+            self.tokenizer.extract_identifiers(source_file.content)
+        )
         all_tokens = [
             token
             for tokenized_line in tokenized_lines
@@ -74,3 +78,9 @@ class InvertedIndex:
 
     def total_documents(self) -> int:
         return len(self.documents)
+    
+    def vocabulary(self) -> set[str]:
+        return set(self.postings.keys())
+    
+    def identifier_vocabulary(self) -> set[str]:
+        return set(self.identifiers)

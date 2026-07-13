@@ -33,3 +33,8 @@ class SearchResponse(BaseModel):
 class HealthResponse(BaseModel):
     status: str
     indexed_documents: int
+
+class AutocompleteResponse(BaseModel):
+    prefix: str
+    suggestion_count: int
+    suggestions: list[str]

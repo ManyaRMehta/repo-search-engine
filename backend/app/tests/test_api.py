@@ -114,3 +114,49 @@ def test_index_repository_returns_422_for_empty_repo(tmp_path: Path):
 
     assert response.status_code == 422
     assert response.json()["detail"] == "No supported source files were found to index."
+
+
+def test_autocomplete_returns_identifier_suggestions(tmp_path: Path):
+    repo = tmp_path / "sample_repo"
+    repo.mkdir()
+
+    (repo / "search.py").write_text(
+        "class SearchEngine:\n"
+        "    def search_repository(self):\n"
+        "        searchable = True\n",
+        encoding="utf-8",
+    )
+
+    index_response = client.post(
+        "/index",
+        json={"repo_path": str(repo)},
+    )
+
+    assert index_response.status_code == 200
+
+    response = client.get(
+        "/autocomplete",
+        params={"prefix": "Search", "limit": 10},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "prefix": "Search",
+        "suggestion_count": 4,
+        "suggestions": [
+            "search",
+            "search_repository",
+            "searchable",
+            "SearchEngine",
+        ],
+    }
+
+
+def test_autocomplete_returns_409_before_repository_is_indexed():
+    response = client.get(
+        "/autocomplete",
+        params={"prefix": "search"},
+    )
+
+    assert response.status_code == 409
+    assert "No repository has been indexed yet" in response.json()["detail"]

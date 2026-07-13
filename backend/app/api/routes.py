@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException, Query
 
 from app.schemas.search import (
+    AutocompleteResponse,
     HealthResponse,
     IndexingSummaryResponse,
     IndexRepositoryRequest,
@@ -79,4 +80,26 @@ def search(
         query=query,
         result_count=len(response_results),
         results=response_results,
+    )
+
+@router.get("/autocomplete", response_model=AutocompleteResponse)
+def autocomplete(
+    prefix: str = Query(..., min_length=1),
+    limit: int = Query(10, ge=1, le=50),
+) -> AutocompleteResponse:
+    if not search_engine.is_ready():
+        raise HTTPException(
+            status_code=409,
+            detail="No repository has been indexed yet. Call POST /index before requesting suggestions.",
+        )
+
+    suggestions = search_engine.suggest(
+        prefix=prefix,
+        limit=limit,
+    )
+
+    return AutocompleteResponse(
+        prefix=prefix,
+        suggestion_count=len(suggestions),
+        suggestions=suggestions,
     )

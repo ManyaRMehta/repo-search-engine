@@ -72,3 +72,17 @@ def test_tokenizer_tracks_line_numbers():
 
     assert tokenized_lines[1].line_number == 2
     assert tokenized_lines[1].tokens == ["return", "jwt", "token"]
+
+def test_extract_identifiers_preserves_full_code_identifiers():
+    tokenizer = CodeTokenizer()
+
+    identifiers = tokenizer.extract_identifiers(
+        "class SearchEngine:\n"
+        "    def index_repository(self, repo_path2):\n"
+        "        _private_value = repo_path2\n"
+    )
+
+    assert "SearchEngine" in identifiers
+    assert "index_repository" in identifiers
+    assert "repo_path2" in identifiers
+    assert "_private_value" in identifiers
