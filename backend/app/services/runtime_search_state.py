@@ -11,4 +11,6 @@ class RuntimeSearchState:
     index: InvertedIndex
     autocomplete: AutocompleteIndex
     ranker: BM25Ranker
-    repo_path: Path
+    repo_path: Path | None
+    repository_id: int | None = None
+    index_version: int | None = None

@@ -57,6 +57,7 @@ def test_hydrate_active_repository_restores_runtime_index(
     )
 
     was_hydrated = indexing_service.hydrate_active_repository()
+    runtime_state = search_engine.current_runtime_state()
 
     results = search_engine.search("SearchEngine")
     suggestions = search_engine.suggest("Search")
@@ -66,6 +67,8 @@ def test_hydrate_active_repository_restores_runtime_index(
     assert results[0].document_id == persisted_document.id
     assert results[0].relative_path == "app/search.py"
     assert "SearchEngine" in suggestions
+    assert runtime_state.repository_id == repository.id
+    assert runtime_state.index_version == repository.index_version
 
 def test_index_repository_persists_and_activates_repository(
     tmp_path: Path,
@@ -88,6 +91,7 @@ def test_index_repository_persists_and_activates_repository(
 
     summary = service.index_repository(repo_path)
     results = search_engine.search("PersistentSearchEngine")
+    runtime_state = search_engine.current_runtime_state()
 
     assert summary.files_indexed == 1
     assert search_engine.total_documents() == 1
@@ -102,6 +106,8 @@ def test_index_repository_persists_and_activates_repository(
         )
 
         assert repository is not None
+        assert runtime_state.repository_id == repository.id
+        assert runtime_state.index_version == repository.index_version
 
         documents = list(
             session.scalars(
@@ -250,6 +256,8 @@ def test_failed_reindex_preserves_database_and_runtime_state(
     def fail_runtime_build(
         repo_path: str | Path,
         documents: list[tuple[int, SourceFile]],
+        repository_id: int | None = None,
+        index_version: int | None = None,
     ) -> RuntimeSearchState:
         raise RuntimeError("runtime build failed")
 

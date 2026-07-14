@@ -1,4 +1,3 @@
-from operator import index
 from pathlib import Path
 
 from app.models.indexing_summary import IndexingSummary
@@ -21,10 +20,33 @@ class SearchEngine:
 
     def __init__(self, crawler: RepositoryCrawler | None = None):
         self.crawler = crawler or RepositoryCrawler()
-        self.index = InvertedIndex()
-        self.autocomplete = AutocompleteIndex()
-        self.ranker = BM25Ranker(self.index)
-        self.indexed_repo_path: Path | None = None
+        #self.index = InvertedIndex()
+        #self.autocomplete = AutocompleteIndex()
+        #self.ranker = BM25Ranker(self.index)
+        #self.indexed_repo_path: Path | None = None
+        self._runtime_state = self._empty_runtime_state()
+
+    @property
+    def index(self) -> InvertedIndex:
+        return self._runtime_state.index
+
+
+    @property
+    def autocomplete(self) -> AutocompleteIndex:
+        return self._runtime_state.autocomplete
+
+
+    @property
+    def ranker(self) -> BM25Ranker:
+        return self._runtime_state.ranker
+
+
+    @property
+    def indexed_repo_path(self) -> Path | None:
+        return self._runtime_state.repo_path
+
+    def current_runtime_state(self) -> RuntimeSearchState:
+        return self._runtime_state
 
     def index_repository(self, repo_path: str | Path) -> IndexingSummary:
         resolved_repo_path = Path(repo_path).resolve()
@@ -56,7 +78,7 @@ class SearchEngine:
             total_tokens=total_tokens,
             indexed_extensions=indexed_extensions,
         )
-    
+
     def load_documents(
         self,
         repo_path: str | Path,
@@ -70,22 +92,36 @@ class SearchEngine:
         self.activate_runtime_state(state)
 
     def search(self, query: str, limit: int = 10) -> list[SearchResult]:
-        return self.ranker.search(query=query, limit=limit)
-    
+        state = self.current_runtime_state()
+        return self.search_state(state, query=query, limit=limit)
+
+    def search_state(
+        self,
+        state: RuntimeSearchState,
+        *,
+        query: str,
+        limit: int = 10,
+    ) -> list[SearchResult]:
+        return state.ranker.search(
+            query=query,
+            limit=limit,
+        )
+
     def suggest(self, prefix: str, limit: int = 10) -> list[str]:
         return self.autocomplete.suggest(prefix=prefix, limit=limit)
 
     def total_documents(self) -> int:
         return self.index.total_documents()
-    
+
     def is_ready(self) -> bool:
         return self.total_documents() > 0
 
     def reset(self) -> None:
-        self.index = InvertedIndex()
-        self.autocomplete = AutocompleteIndex()
-        self.ranker = BM25Ranker(self.index)
-        self.indexed_repo_path = None
+        #self.index = InvertedIndex()
+        #self.autocomplete = AutocompleteIndex()
+        #self.ranker = BM25Ranker(self.index)
+        #self.indexed_repo_path = None
+        self._runtime_state = self._empty_runtime_state()
 
     def _replace_runtime_index(
         self,
@@ -115,6 +151,8 @@ class SearchEngine:
         self,
         repo_path: str | Path,
         documents: list[tuple[int, SourceFile]],
+        repository_id: int | None = None,
+        index_version: int | None = None,
     ) -> RuntimeSearchState:
         resolved_repo_path = Path(repo_path).resolve()
         index = InvertedIndex()
@@ -133,19 +171,33 @@ class SearchEngine:
         )
 
         autocomplete.build(autocomplete_terms)
-    
+
         return RuntimeSearchState(
             index=index,
             autocomplete=autocomplete,
             ranker=BM25Ranker(index),
             repo_path=resolved_repo_path,
+            repository_id=repository_id,
+            index_version=index_version,
        )
 
     def activate_runtime_state(
         self,
         state: RuntimeSearchState,
     ) -> None:
-        self.index = state.index
-        self.autocomplete = state.autocomplete
-        self.ranker = state.ranker
-        self.indexed_repo_path = state.repo_path
+        #self.index = state.index
+        #self.autocomplete = state.autocomplete
+        #self.ranker = state.ranker
+        #self.indexed_repo_path = state.repo_path
+        self._runtime_state = state
+
+    @staticmethod
+    def _empty_runtime_state() -> RuntimeSearchState:
+        index = InvertedIndex()
+
+        return RuntimeSearchState(
+            index=index,
+            autocomplete=AutocompleteIndex(),
+            ranker=BM25Ranker(index),
+            repo_path=None,
+        )

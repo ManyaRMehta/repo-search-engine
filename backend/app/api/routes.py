@@ -9,7 +9,7 @@ from app.schemas.search import (
     SearchResultResponse,
     SnippetLineResponse
 )
-from app.runtime import indexing_service, search_engine
+from app.runtime import indexing_service, search_engine, search_service
 from app.services.indexing_service import NoIndexableFilesError
 router = APIRouter()
 
@@ -55,7 +55,7 @@ def search(
             status_code=409,
             detail="No repository has been indexed yet. Call POST /index before searching.",
         )
-    results = search_engine.search(query=query, limit=limit)
+    results = search_service.search(query=query, limit=limit)
 
     response_results = [
         SearchResultResponse(

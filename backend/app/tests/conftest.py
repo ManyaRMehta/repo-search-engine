@@ -1,6 +1,6 @@
 import os
 from collections.abc import Generator
-
+from redis import Redis
 import pytest
 from sqlalchemy import create_engine, delete
 from sqlalchemy.orm import Session
@@ -15,6 +15,12 @@ from app.database.records import (
     RepositoryRecord,
 )
 
+DEFAULT_TEST_REDIS_URL = "redis://localhost:6379/1"
+
+TEST_REDIS_URL = os.getenv(
+    "TEST_REDIS_URL",
+    DEFAULT_TEST_REDIS_URL,
+)
 
 DEFAULT_TEST_DATABASE_URL = (
     "postgresql+psycopg://repo_search:repo_search"
@@ -39,7 +45,22 @@ TestSessionLocal = sessionmaker(
 
 SessionFactory = Callable[[], AbstractContextManager[Session]]
 
+@pytest.fixture
+def redis_client() -> Generator[Redis, None, None]:
+    client = Redis.from_url(
+        TEST_REDIS_URL,
+        socket_connect_timeout=0.5,
+        socket_timeout=0.5,
+    )
 
+    client.flushdb()
+
+    try:
+        yield client
+    finally:
+        client.flushdb()
+        client.close()
+        
 @pytest.fixture
 def database_session() -> Generator[Session, None, None]:
     connection = test_engine.connect()
