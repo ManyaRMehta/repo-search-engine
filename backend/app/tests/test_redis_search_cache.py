@@ -1,7 +1,7 @@
+import pytest
 from app.models.search_result import SearchResult, SnippetLine
 from app.services.redis_search_cache import RedisSearchCache
 from app.services.search_cache_key import SearchCacheKeyBuilder
-import pytest
 import time
 from redis.exceptions import ConnectionError
 from redis import Redis
@@ -213,6 +213,7 @@ def test_redis_search_cache_decodes_byte_payloads() -> None:
 
     assert restored_results == original_results
 
+@pytest.mark.redis_integration
 def test_redis_search_cache_round_trips_results_with_real_redis(
     redis_client: Redis,
 ) -> None:
@@ -255,6 +256,7 @@ def test_redis_search_cache_round_trips_results_with_real_redis(
 
     assert restored_results == original_results
 
+@pytest.mark.redis_integration
 def test_redis_search_cache_expires_results_after_ttl(
     redis_client: Redis,
 ) -> None:
@@ -300,6 +302,7 @@ def test_redis_search_cache_expires_results_after_ttl(
         limit=5,
     ) is None
 
+@pytest.mark.redis_integration
 def test_redis_search_cache_isolates_index_versions(
     redis_client: Redis,
 ) -> None:

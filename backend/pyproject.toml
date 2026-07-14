@@ -28,3 +28,7 @@ include = ["app*"]
 [tool.pytest.ini_options]
 testpaths = ["app/tests"]
 pythonpath = ["."]
+markers = [
+    "postgres_integration: tests that require a running PostgreSQL database",
+    "redis_integration: tests that require a running Redis server",
+]

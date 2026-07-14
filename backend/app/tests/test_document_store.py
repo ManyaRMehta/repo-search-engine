@@ -7,6 +7,7 @@ from app.models.source_file import SourceFile
 from app.stores.document_store import DocumentStore
 from app.stores.repository_store import RepositoryStore
 
+pytestmark = pytest.mark.postgres_integration
 
 def make_source_file(
     relative_path: str,
