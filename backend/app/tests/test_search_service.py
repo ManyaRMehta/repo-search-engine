@@ -1,5 +1,5 @@
 from pathlib import Path
-
+import logging
 from app.models.search_result import SearchResult
 from app.models.source_file import SourceFile
 from app.services.search_engine import SearchEngine
@@ -214,6 +214,7 @@ class ReadFailureSearchCache(FakeSearchCache):
     
 def test_search_service_falls_back_when_cache_read_fails(
     tmp_path: Path,
+    caplog,
 ) -> None:
     search_engine = SearchEngine()
 
@@ -239,7 +240,10 @@ def test_search_service_falls_back_when_cache_read_fails(
         search_engine=search_engine,
         cache=cache,
     )
-
+    caplog.set_level(
+        logging.WARNING,
+        logger="app.services.search_service",
+    )
     results = service.search(
         query="jwt",
         limit=5,
@@ -247,6 +251,9 @@ def test_search_service_falls_back_when_cache_read_fails(
 
     assert len(results) == 1
     assert results[0].document_id == 42
+    assert "Search-cache read failed" in caplog.text
+    assert "repository_id=7" in caplog.text
+    assert "index_version=3" in caplog.text
 
 class WriteFailureSearchCache(FakeSearchCache):
     def set(
@@ -262,6 +269,7 @@ class WriteFailureSearchCache(FakeSearchCache):
     
 def test_search_service_returns_results_when_cache_write_fails(
     tmp_path: Path,
+    caplog,
 ) -> None:
     search_engine = SearchEngine()
 
@@ -287,7 +295,10 @@ def test_search_service_returns_results_when_cache_write_fails(
         search_engine=search_engine,
         cache=cache,
     )
-
+    caplog.set_level(
+        logging.WARNING,
+        logger="app.services.search_service",
+    )
     results = service.search(
         query="jwt",
         limit=5,
@@ -295,6 +306,9 @@ def test_search_service_returns_results_when_cache_write_fails(
 
     assert len(results) == 1
     assert results[0].document_id == 42
+    assert "Search-cache write failed" in caplog.text
+    assert "repository_id=7" in caplog.text
+    assert "index_version=3" in caplog.text
 
 def test_search_service_bypasses_cache_without_repository_identity(
     tmp_path: Path,

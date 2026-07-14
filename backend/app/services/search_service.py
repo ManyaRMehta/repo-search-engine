@@ -1,7 +1,9 @@
 from app.models.search_result import SearchResult
 from app.services.search_cache import SearchCache, SearchCacheError
 from app.services.search_engine import SearchEngine
+import logging
 
+logger = logging.getLogger(__name__)
 
 class SearchService:
     """Coordinates cached search execution."""
@@ -41,6 +43,13 @@ class SearchService:
                 limit=limit,
             )
         except SearchCacheError:
+            logger.warning(
+                "Search-cache read failed; repository_id=%s index_version=%s",
+                state.repository_id,
+                state.index_version,
+                exc_info=True,
+            )
+
             return self.search_engine.search_state(
                 state,
                 query=query,
@@ -65,6 +74,11 @@ class SearchService:
                 results=results,
             )
         except SearchCacheError:
-            pass
+            logger.warning(
+            "Search-cache write failed; repository_id=%s index_version=%s",
+            state.repository_id,
+            state.index_version,
+            exc_info=True,
+        )
 
         return results

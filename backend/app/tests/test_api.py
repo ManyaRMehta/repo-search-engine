@@ -5,22 +5,48 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
-from app.runtime import indexing_service, search_engine
+from app.runtime import indexing_service, search_engine, search_service
+from app.models.search_result import SearchResult, SnippetLine
 
+
+
+class ApiTestSearchCache:
+    def get(
+        self,
+        *,
+        repository_id: int,
+        index_version: int,
+        query: str,
+        limit: int,
+    ) -> list[SearchResult] | None:
+        return None
+
+    def set(
+        self,
+        *,
+        repository_id: int,
+        index_version: int,
+        query: str,
+        limit: int,
+        results: list[SearchResult],
+    ) -> None:
+        pass
 
 @pytest.fixture(autouse=True)
 def configure_test_runtime(
     database_session_factory,
 ) -> Generator[None, None, None]:
     original_session_factory = indexing_service.session_factory
-
+    original_cache = search_service.cache
     indexing_service.session_factory = database_session_factory
+    search_service.cache = ApiTestSearchCache()
     search_engine.reset()
 
     try:
         yield
     finally:
         search_engine.reset()
+        search_service.cache = original_cache
         indexing_service.session_factory = original_session_factory
 
 
@@ -233,3 +259,77 @@ def test_application_restart_hydrates_persisted_repository(
             == initial_document_id
         )
         assert restored_results[0]["relative_path"] == "search.py"
+
+def test_search_endpoint_uses_search_service(
+    client: TestClient,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo = tmp_path / "sample_repo"
+    repo.mkdir()
+
+    (repo / "auth.py").write_text(
+        "jwt token validation",
+        encoding="utf-8",
+    )
+
+    index_response = client.post(
+        "/index",
+        json={"repo_path": str(repo)},
+    )
+
+    assert index_response.status_code == 200
+
+    expected_results = [
+        SearchResult(
+            document_id=999,
+            relative_path="cached/result.py",
+            score=8.5,
+            matched_tokens=["jwt"],
+            line_numbers=[12],
+            snippets=[
+                SnippetLine(
+                    line_number=12,
+                    text="cached search result",
+                )
+            ],
+        )
+    ]
+
+    def return_expected_results(
+        *,
+        query: str,
+        limit: int = 10,
+    ) -> list[SearchResult]:
+        assert query == "jwt"
+        assert limit == 5
+        return expected_results
+
+    monkeypatch.setattr(
+        search_service,
+        "search",
+        return_expected_results,
+    )
+
+    response = client.get(
+        "/search",
+        params={
+            "query": "jwt",
+            "limit": 5,
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["results"][0] == {
+        "document_id": 999,
+        "relative_path": "cached/result.py",
+        "score": 8.5,
+        "matched_tokens": ["jwt"],
+        "line_numbers": [12],
+        "snippets": [
+            {
+                "line_number": 12,
+                "text": "cached search result",
+            }
+        ],
+    }
