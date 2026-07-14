@@ -19,7 +19,7 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
-  
+
   redis:
     image: redis:8-alpine
     container_name: repo-search-redis
@@ -30,6 +30,36 @@ services:
       interval: 5s
       timeout: 3s
       retries: 5
+
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: repo-search-api:dev
+    container_name: repo-search-api
+    environment:
+      DATABASE_URL: postgresql+psycopg://repo_search:repo_search@postgres:5432/repo_search_engine
+      REDIS_URL: redis://redis:6379/0
+      SEARCH_CACHE_TTL_SECONDS: 900
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./:/repositories/repo-search-engine:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=2)"
+        ]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
 
 volumes:
   repo_search_postgres_data:
