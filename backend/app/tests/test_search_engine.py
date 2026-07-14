@@ -197,3 +197,77 @@ def test_build_runtime_state_does_not_replace_active_index(
 
     assert len(candidate_results) == 1
     assert candidate_results[0].document_id == 2
+
+def test_build_runtime_state_preserves_repository_identity(
+    tmp_path: Path,
+) -> None:
+    engine = SearchEngine()
+
+    content = "searchable repository content"
+    source_file = SourceFile(
+        path=tmp_path / "search.py",
+        relative_path="search.py",
+        extension=".py",
+        size_bytes=len(content.encode("utf-8")),
+        content=content,
+    )
+
+    state = engine.build_runtime_state(
+        repo_path=tmp_path,
+        documents=[(42, source_file)],
+        repository_id=7,
+        index_version=3,
+    )
+
+    assert state.repository_id == 7
+    assert state.index_version == 3
+
+def test_captured_runtime_state_remains_consistent_after_activation(
+    tmp_path: Path,
+) -> None:
+    engine = SearchEngine()
+
+    first_content = "alphaexclusive"
+    first_file = SourceFile(
+        path=tmp_path / "first.py",
+        relative_path="first.py",
+        extension=".py",
+        size_bytes=len(first_content.encode("utf-8")),
+        content=first_content,
+    )
+
+    second_content = "betadistinct"
+    second_file = SourceFile(
+        path=tmp_path / "second.py",
+        relative_path="second.py",
+        extension=".py",
+        size_bytes=len(second_content.encode("utf-8")),
+        content=second_content,
+    )
+
+    first_state = engine.build_runtime_state(
+        repo_path=tmp_path,
+        documents=[(1, first_file)],
+        repository_id=7,
+        index_version=1,
+    )
+    engine.activate_runtime_state(first_state)
+
+    captured_state = engine.current_runtime_state()
+
+    second_state = engine.build_runtime_state(
+        repo_path=tmp_path,
+        documents=[(2, second_file)],
+        repository_id=7,
+        index_version=2,
+    )
+    engine.activate_runtime_state(second_state)
+
+    assert captured_state is first_state
+    assert engine.current_runtime_state() is second_state
+
+    assert len(captured_state.ranker.search("alphaexclusive")) == 1
+    assert captured_state.ranker.search("betadistinct") == []
+
+    assert engine.search("alphaexclusive") == []
+    assert len(engine.search("betadistinct")) == 1

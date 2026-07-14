@@ -59,12 +59,14 @@ class IndexingService:
         candidate_state = self.search_engine.build_runtime_state(
             repo_path=repository_path,
             documents=documents,
+            repository_id=repository.id,
+            index_version=repository.index_version,
         )
 
         self.search_engine.activate_runtime_state(candidate_state)
 
         return True
-    
+
     def index_repository(
         self,
         repo_path: str | Path,
@@ -123,11 +125,20 @@ class IndexingService:
                     for document in document_records
                 ]
 
-                candidate_state = (
-                    self.search_engine.build_runtime_state(
-                        repo_path=repository.canonical_path,
-                        documents=documents,
-                    )
+                #candidate_state = (
+                #    self.search_engine.build_runtime_state(
+                #        repo_path=repository.canonical_path,
+                #        documents=documents,
+                #    )
+                #)
+
+                repository_store.mark_ready(repository)
+
+                candidate_state = self.search_engine.build_runtime_state(
+                    repo_path=repository.canonical_path,
+                    documents=documents,
+                    repository_id=repository.id,
+                    index_version=repository.index_version,
                 )
 
                 total_tokens = sum(
@@ -143,9 +154,11 @@ class IndexingService:
                     }
                 )
 
-                repository_store.mark_ready(repository)
-                repository_store.set_active(repository.id)
 
+                #repository_store.set_active(repository.id)
+
+
+                repository_store.set_active(repository.id)
                 indexing_run_store.mark_succeeded(
                     indexing_run,
                     files_discovered=sync_summary.files_discovered,
@@ -198,33 +211,7 @@ class IndexingService:
             session.commit()
 
             return repository.id, indexing_run.id
-        
-    def _record_indexing_failure(
-        self,
-        *,
-        repository_id: int,
-        indexing_run_id: int,
-        error_message: str,
-    ) -> None:
-        with self.session_factory() as session:
-            repository_store = RepositoryStore(session)
-            indexing_run_store = IndexingRunStore(session)
 
-            repository = repository_store.get_by_id(repository_id)
-            indexing_run = indexing_run_store.get_by_id(
-                indexing_run_id
-            )
-
-            if repository is not None:
-                repository_store.mark_indexing_failed(repository)
-
-            if indexing_run is not None:
-                indexing_run_store.mark_failed(
-                    indexing_run,
-                    error_message=error_message,
-                )
-
-            session.commit()
 
     def _record_indexing_failure(
         self,
@@ -266,4 +253,3 @@ class IndexingService:
             content=document.content,
         )
 
-   
