@@ -19,9 +19,25 @@ class InvertedIndex:
         self.identifiers: set[str] = set()
         self._next_document_id = 1
 
-    def add_document(self, source_file: SourceFile) -> int:
-        document_id = self._next_document_id
-        self._next_document_id += 1
+    def add_document(
+        self,
+        source_file: SourceFile,
+        document_id: int | None = None,
+    ) -> int:
+        if document_id is None:
+            document_id = self._next_document_id
+        elif document_id <= 0:
+            raise ValueError("Document ID must be positive.")
+
+        if document_id in self.documents:
+            raise ValueError(
+                f"Document ID already exists in the index: {document_id}"
+            )
+
+        self._next_document_id = max(
+            self._next_document_id,
+            document_id + 1,
+        )
 
         tokenized_lines = self.tokenizer.tokenize_by_line(source_file.content)
         self.identifiers.update(

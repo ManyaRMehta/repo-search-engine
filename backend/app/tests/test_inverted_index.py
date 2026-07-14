@@ -2,6 +2,7 @@ from pathlib import Path
 
 from app.models.source_file import SourceFile
 from app.services.inverted_index import InvertedIndex
+import pytest
 
 
 def make_source_file(relative_path: str, content: str) -> SourceFile:
@@ -104,3 +105,56 @@ def test_index_handles_multiple_documents():
 
     assert jwt_postings[0].document_id == 1
     assert user_postings[0].document_id == 2
+
+def test_add_document_accepts_explicit_document_id(
+    tmp_path: Path,
+) -> None:
+    index = InvertedIndex()
+
+    first_file = SourceFile(
+        path=tmp_path / "first.py",
+        relative_path="first.py",
+        extension=".py",
+        size_bytes=5,
+        content="first",
+    )
+
+    second_file = SourceFile(
+        path=tmp_path / "second.py",
+        relative_path="second.py",
+        extension=".py",
+        size_bytes=6,
+        content="second",
+    )
+
+    explicit_id = index.add_document(
+        first_file,
+        document_id=42,
+    )
+    automatic_id = index.add_document(second_file)
+
+    assert explicit_id == 42
+    assert automatic_id == 43
+    assert index.get_document(42) is not None
+    assert index.get_document(43) is not None
+
+def test_add_document_rejects_duplicate_document_id(
+    tmp_path: Path,
+) -> None:
+    index = InvertedIndex()
+
+    source_file = SourceFile(
+        path=tmp_path / "main.py",
+        relative_path="main.py",
+        extension=".py",
+        size_bytes=4,
+        content="main",
+    )
+
+    index.add_document(source_file, document_id=10)
+
+    with pytest.raises(
+        ValueError,
+        match="Document ID already exists",
+    ):
+        index.add_document(source_file, document_id=10)

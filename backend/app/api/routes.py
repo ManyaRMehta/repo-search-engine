@@ -9,13 +9,11 @@ from app.schemas.search import (
     SearchResultResponse,
     SnippetLineResponse
 )
-from app.services.search_engine import SearchEngine
-
+from app.runtime import indexing_service, search_engine
+from app.services.indexing_service import NoIndexableFilesError
 router = APIRouter()
 
-# In-memory engine for now.
-# Later, PostgreSQL will make this persistent across restarts.
-search_engine = SearchEngine()
+
 
 
 @router.get("/health", response_model=HealthResponse)
@@ -29,16 +27,15 @@ def health_check() -> HealthResponse:
 @router.post("/index", response_model=IndexingSummaryResponse)
 def index_repository(request: IndexRepositoryRequest) -> IndexingSummaryResponse:
     try:
-        summary = search_engine.index_repository(request.repo_path)
-        if summary.files_indexed == 0:
-            raise HTTPException(
-                status_code=422,
-                detail="No supported source files were found to index.",
-            )
+        summary = indexing_service.index_repository(
+            request.repo_path
+        )
     except FileNotFoundError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
     except NotADirectoryError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
+    except NoIndexableFilesError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
 
     return IndexingSummaryResponse(
         repo_path=summary.repo_path,

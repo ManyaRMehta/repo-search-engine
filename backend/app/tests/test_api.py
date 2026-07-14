@@ -1,17 +1,36 @@
+from collections.abc import Generator
 from pathlib import Path
+
 import pytest
-from app.api.routes import search_engine
 from fastapi.testclient import TestClient
 
 from app.main import app
+from app.runtime import indexing_service, search_engine
 
-client = TestClient(app)
+
 @pytest.fixture(autouse=True)
-def reset_search_engine_between_tests():
+def configure_test_runtime(
+    database_session_factory,
+) -> Generator[None, None, None]:
+    original_session_factory = indexing_service.session_factory
+
+    indexing_service.session_factory = database_session_factory
     search_engine.reset()
 
+    try:
+        yield
+    finally:
+        search_engine.reset()
+        indexing_service.session_factory = original_session_factory
 
-def test_health_check():
+
+@pytest.fixture
+def client() -> Generator[TestClient, None, None]:
+    with TestClient(app) as test_client:
+        yield test_client
+
+
+def test_health_check(client: TestClient):
     response = client.get("/health")
 
     assert response.status_code == 200
@@ -19,7 +38,7 @@ def test_health_check():
     assert "indexed_documents" in response.json()
 
 
-def test_index_repository_and_search(tmp_path: Path):
+def test_index_repository_and_search(client: TestClient,tmp_path: Path):
     repo = tmp_path / "sample_repo"
     repo.mkdir()
 
@@ -66,7 +85,7 @@ def test_index_repository_and_search(tmp_path: Path):
     assert "text" in search_data["results"][0]["snippets"][0]
 
 
-def test_index_repository_returns_404_for_missing_path():
+def test_index_repository_returns_404_for_missing_path(client: TestClient):
     response = client.post(
         "/index",
         json={"repo_path": "does-not-exist"},
@@ -75,7 +94,7 @@ def test_index_repository_returns_404_for_missing_path():
     assert response.status_code == 404
 
 
-def test_search_respects_limit(tmp_path: Path):
+def test_search_respects_limit(client: TestClient, tmp_path: Path):
     repo = tmp_path / "sample_repo"
     repo.mkdir()
 
@@ -93,7 +112,7 @@ def test_search_respects_limit(tmp_path: Path):
     assert response.status_code == 200
     assert response.json()["result_count"] == 2
 
-def test_search_returns_409_before_repository_is_indexed():
+def test_search_returns_409_before_repository_is_indexed(client: TestClient):
     response = client.get(
         "/search",
         params={"query": "jwt"},
@@ -103,7 +122,7 @@ def test_search_returns_409_before_repository_is_indexed():
     assert "No repository has been indexed yet" in response.json()["detail"]
 
 
-def test_index_repository_returns_422_for_empty_repo(tmp_path: Path):
+def test_index_repository_returns_422_for_empty_repo(client: TestClient, tmp_path: Path):
     repo = tmp_path / "empty_repo"
     repo.mkdir()
 
@@ -116,7 +135,7 @@ def test_index_repository_returns_422_for_empty_repo(tmp_path: Path):
     assert response.json()["detail"] == "No supported source files were found to index."
 
 
-def test_autocomplete_returns_identifier_suggestions(tmp_path: Path):
+def test_autocomplete_returns_identifier_suggestions(client: TestClient, tmp_path: Path):
     repo = tmp_path / "sample_repo"
     repo.mkdir()
 
@@ -152,7 +171,7 @@ def test_autocomplete_returns_identifier_suggestions(tmp_path: Path):
     }
 
 
-def test_autocomplete_returns_409_before_repository_is_indexed():
+def test_autocomplete_returns_409_before_repository_is_indexed(client: TestClient):
     response = client.get(
         "/autocomplete",
         params={"prefix": "search"},
@@ -160,3 +179,57 @@ def test_autocomplete_returns_409_before_repository_is_indexed():
 
     assert response.status_code == 409
     assert "No repository has been indexed yet" in response.json()["detail"]
+
+def test_application_restart_hydrates_persisted_repository(
+    tmp_path: Path,
+) -> None:
+    repo = tmp_path / "restart_repository"
+    repo.mkdir()
+
+    (repo / "search.py").write_text(
+        "restartpersistenttoken",
+        encoding="utf-8",
+    )
+
+    with TestClient(app) as first_client:
+        index_response = first_client.post(
+            "/index",
+            json={"repo_path": str(repo)},
+        )
+
+        assert index_response.status_code == 200
+
+        initial_search_response = first_client.get(
+            "/search",
+            params={"query": "restartpersistenttoken"},
+        )
+
+        assert initial_search_response.status_code == 200
+
+        initial_document_id = (
+            initial_search_response.json()["results"][0]["document_id"]
+        )
+
+    # Simulate losing all process-local search state.
+    search_engine.reset()
+
+    assert search_engine.is_ready() is False
+
+    # Starting a new application lifespan should rebuild the index
+    # entirely from PostgreSQL.
+    with TestClient(app) as restarted_client:
+        restored_search_response = restarted_client.get(
+            "/search",
+            params={"query": "restartpersistenttoken"},
+        )
+
+        assert restored_search_response.status_code == 200
+
+        restored_results = restored_search_response.json()["results"]
+
+        assert len(restored_results) == 1
+        assert (
+            restored_results[0]["document_id"]
+            == initial_document_id
+        )
+        assert restored_results[0]["relative_path"] == "search.py"

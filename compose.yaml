@@ -1,0 +1,24 @@
+services:
+  postgres:
+    image: postgres:17
+    container_name: repo-search-postgres
+    environment:
+      POSTGRES_USER: repo_search
+      POSTGRES_PASSWORD: repo_search
+      POSTGRES_DB: repo_search_engine
+    ports:
+      - "5433:5432"
+    volumes:
+      - repo_search_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U repo_search -d repo_search_engine"
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  repo_search_postgres_data:

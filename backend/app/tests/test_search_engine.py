@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from app.services.search_engine import SearchEngine
+from app.models.source_file import SourceFile
 
 
 def test_search_engine_indexes_repository(tmp_path: Path):
@@ -122,3 +123,77 @@ def test_search_engine_returns_autocomplete_suggestions(tmp_path):
         "searchable",
         "SearchEngine",
     ]
+
+def test_load_documents_uses_persisted_document_ids(
+    tmp_path: Path,
+) -> None:
+    engine = SearchEngine()
+
+    source_file = SourceFile(
+        path=tmp_path / "search.py",
+        relative_path="search.py",
+        extension=".py",
+        size_bytes=20,
+        content="class SearchEngine:",
+    )
+
+    engine.load_documents(
+        repo_path=tmp_path,
+        documents=[(42, source_file)],
+    )
+
+    results = engine.search("SearchEngine")
+
+    assert engine.total_documents() == 1
+    assert engine.indexed_repo_path == tmp_path.resolve()
+    assert results[0].document_id == 42
+    suggestions = engine.suggest("Search")
+    assert "search" in suggestions
+    assert "SearchEngine" in suggestions
+
+
+def test_build_runtime_state_does_not_replace_active_index(
+    tmp_path: Path,
+) -> None:
+    engine = SearchEngine()
+
+    active_content = "alphaexclusive"
+    candidate_content = "betadistinct"
+
+    active_file = SourceFile(
+        path=tmp_path / "active.py",
+        relative_path="active.py",
+        extension=".py",
+        size_bytes=len(active_content.encode("utf-8")),
+        content=active_content,
+    )
+
+    candidate_file = SourceFile(
+        path=tmp_path / "candidate.py",
+        relative_path="candidate.py",
+        extension=".py",
+        size_bytes=len(candidate_content.encode("utf-8")),
+        content=candidate_content,
+    )
+
+    engine.load_documents(
+        repo_path=tmp_path / "active",
+        documents=[(1, active_file)],
+    )
+
+    candidate_state = engine.build_runtime_state(
+        repo_path=tmp_path / "candidate",
+        documents=[(2, candidate_file)],
+    )
+
+    assert len(engine.search("alphaexclusive")) == 1
+    assert engine.search("betadistinct") == []
+
+    engine.activate_runtime_state(candidate_state)
+
+    assert engine.search("alphaexclusive") == []
+
+    candidate_results = engine.search("betadistinct")
+
+    assert len(candidate_results) == 1
+    assert candidate_results[0].document_id == 2
