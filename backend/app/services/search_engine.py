@@ -92,7 +92,20 @@ class SearchEngine:
         self.activate_runtime_state(state)
 
     def search(self, query: str, limit: int = 10) -> list[SearchResult]:
-        return self.ranker.search(query=query, limit=limit)
+        state = self.current_runtime_state()
+        return self.search_state(state, query=query, limit=limit)
+
+    def search_state(
+        self,
+        state: RuntimeSearchState,
+        *,
+        query: str,
+        limit: int = 10,
+    ) -> list[SearchResult]:
+        return state.ranker.search(
+            query=query,
+            limit=limit,
+        )
 
     def suggest(self, prefix: str, limit: int = 10) -> list[str]:
         return self.autocomplete.suggest(prefix=prefix, limit=limit)

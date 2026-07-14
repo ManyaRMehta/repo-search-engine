@@ -266,8 +266,18 @@ def test_captured_runtime_state_remains_consistent_after_activation(
     assert captured_state is first_state
     assert engine.current_runtime_state() is second_state
 
-    assert len(captured_state.ranker.search("alphaexclusive")) == 1
-    assert captured_state.ranker.search("betadistinct") == []
+    #assert len(captured_state.ranker.search("alphaexclusive")) == 1
+    #assert captured_state.ranker.search("betadistinct") == []
+    assert len(
+        engine.search_state(
+            captured_state,
+            query="alphaexclusive",
+        )
+    ) == 1
 
+    assert engine.search_state(
+        captured_state,
+        query="betadistinct",
+    ) == []
     assert engine.search("alphaexclusive") == []
     assert len(engine.search("betadistinct")) == 1
