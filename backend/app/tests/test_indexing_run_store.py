@@ -1,8 +1,11 @@
+import pytest
+
 from sqlalchemy.orm import Session
 
 from app.stores.indexing_run_store import IndexingRunStore
 from app.stores.repository_store import RepositoryStore
 
+pytestmark = pytest.mark.postgres_integration
 
 def create_repository(database_session: Session) -> int:
     repository = RepositoryStore(database_session).create(

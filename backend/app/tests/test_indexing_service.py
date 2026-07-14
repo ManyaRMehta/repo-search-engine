@@ -17,7 +17,7 @@ from app.database.records import (
     RepositoryRecord,
 )
 from app.services.runtime_search_state import RuntimeSearchState
-
+pytestmark = pytest.mark.postgres_integration
 
 def test_hydrate_active_repository_restores_runtime_index(
     database_session: Session,

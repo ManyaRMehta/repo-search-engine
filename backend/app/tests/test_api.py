@@ -8,6 +8,9 @@ from app.main import app
 from app.runtime import indexing_service, search_engine, search_service
 from app.models.search_result import SearchResult, SnippetLine
 
+pytestmark = pytest.mark.postgres_integration
+
+
 
 
 class ApiTestSearchCache:
